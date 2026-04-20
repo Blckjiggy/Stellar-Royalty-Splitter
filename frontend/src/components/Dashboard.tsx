@@ -99,7 +99,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ contractId }) => {
           <input
             type="date"
             value={dateRange.end}
-            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+            onChange={(e) =>
+              setDateRange({ ...dateRange, end: e.target.value })
+            }
           />
           <button onClick={loadStats} className="refresh-btn">
             🔄 Refresh
@@ -160,7 +162,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ contractId }) => {
               <div className="kpi-icon">👥</div>
               <div className="kpi-content">
                 <div className="kpi-label">Active Collaborators</div>
-                <div className="kpi-value">{stats.collaboratorStats.length}</div>
+                <div className="kpi-value">
+                  {stats.collaboratorStats.length}
+                </div>
                 <div className="kpi-unit">unique addresses</div>
               </div>
             </div>
@@ -178,9 +182,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ contractId }) => {
                     <YAxis />
                     <Tooltip
                       formatter={(value) =>
-                        typeof value === "number"
-                          ? value.toFixed(2)
-                          : value
+                        typeof value === "number" ? value.toFixed(2) : value
                       }
                     />
                     <Legend />
@@ -292,13 +294,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ contractId }) => {
                         </td>
                         <td className="text-right">{collab.payoutCount}</td>
                         <td className="text-right">
-                          {(collab.totalEarned / collab.payoutCount).toLocaleString(
-                            "en-US",
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            }
-                          )}
+                          {(
+                            collab.totalEarned / collab.payoutCount
+                          ).toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
                       </tr>
                     ))
