@@ -121,4 +121,17 @@ mod tests {
         client.distribute(&10_000_i128);
     }
 
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn test_non_admin_cannot_set_royalty_rate() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, RoyaltySplitter);
+        let client = RoyaltySplitterClient::new(&env, &contract_id);
+        let collaborators = make_addresses(&env, 2);
+        env.mock_all_auths();
+        client.initialize(&collaborators, &100);
+        env.set_auths(&[]);
+        let result = client.try_set_royalty_rate(&999);
+        assert!(result.is_err());
+    }
 }
