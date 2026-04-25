@@ -69,6 +69,8 @@ export default function App() {
     tryReconnect();
   }, []);
 
+  const contractIdValid = isValidContractId(contractId);
+
   // Fetch on-chain royalty rate when contract changes
   useEffect(() => {
     async function fetchRate() {
