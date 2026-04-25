@@ -35,11 +35,12 @@ initializeRouter.post("/", validate(initializeSchema), async (req, res, next) =>
     }
 
     // Record transaction in database for audit trail
+    // requestedAmount is null for initialize — it is not a financial transfer
     const transactionId = recordTransaction(
       contractId,
       "initialize",
       walletAddress,
-      { collaboratorCount: collaborators.length },
+      { requestedAmount: null, tokenId: null },
     );
 
     const collaboratorVec = vecToScVal(collaborators.map(addressToScVal));
