@@ -91,7 +91,9 @@ impl RoyaltySplitter {
             payouts.push_back((addr, payout));
             total_calculated += payout;
         }
-        // Last collaborator gets the remainder to avoid rounding dust loss.
+        // Last collaborator receives the remainder (amount - sum of truncated payouts).
+        // Dust is bounded by (n - 1) stroops in the worst case, where n is the number
+        // of collaborators, because each integer division truncates at most 1 stroop.
         let last = collaborators.get(n - 1).unwrap();
         payouts.push_back((last, amount - total_calculated));
 
@@ -188,6 +190,8 @@ impl RoyaltySplitter {
             payouts.push_back((addr, payout));
             total_calculated += payout;
         }
+        // Last collaborator receives the remainder (pool - sum of truncated payouts).
+        // Dust is bounded by (n - 1) stroops in the worst case.
         let last = collaborators.get(n - 1).unwrap();
         payouts.push_back((last, pool - total_calculated));
 
