@@ -47,7 +47,7 @@ export interface AuditLogEntry {
   contractId: string;
   action: string;
   user: string | null;
-  details: string | null;
+  details: Record<string, unknown> | null;
   timestamp: string;
 }
 
@@ -210,6 +210,7 @@ export const api = {
         status: string;
         initiatorAddress: string;
       }>;
+      total: number;
     }>(
       `/secondary-royalty/distributions/${contractId}?limit=${limit}&offset=${offset}`,
     ),
@@ -244,5 +245,11 @@ export const api = {
       message?: string;
     }>(
       `/analytics/${contractId}${dateRange ? `?start=${dateRange.start}&end=${dateRange.end}` : ""}`,
+    ),
+
+  // Contract version API
+  getContractVersion: (contractId: string) =>
+    get<{ contractId: string; version: string }>(
+      `/contract/version/${contractId}`,
     ),
 };

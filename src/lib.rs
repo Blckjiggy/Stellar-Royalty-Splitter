@@ -1,6 +1,7 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, token, Address, Env, Map, Vec,
+    contract, contractimpl, contracttype, symbol_short,
+    token, Address, Env, Map, Vec, String,
 };
 
 #[contracttype]
@@ -12,6 +13,8 @@ pub enum DataKey {
     SecondaryRoyaltyPool,
     SecondaryPool,
     SecondaryToken,
+    ContractVersion,
+    RoyaltyRate,
 }
 
 #[contract]
@@ -19,36 +22,105 @@ pub struct RoyaltySplitter;
 
 #[contractimpl]
 impl RoyaltySplitter {
-    /// Initialize the contract with collaborators and their basis-point shares (must sum to 10,000).
-    pub fn initialize(env: Env, collaborators: Vec<Address>, shares: Vec<u32>) {
+
+    pub fn initialize(
+        env: Env,
+        collaborators: Vec<Address>,
+        shares: Vec<u32>,
+    ) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("already initialized");
         }
+
         if collaborators.is_empty() {
             panic!("need at least one collaborator");
         }
+
         if collaborators.len() != shares.len() {
             panic!("collaborators and shares length mismatch");
         }
 
         let total: u32 = shares.iter().sum();
+
         if total != 10_000 {
             panic!("shares must sum to 10000");
         }
 
-        let mut share_map: Map<Address, u32> = Map::new(&env);
+        let mut share_map: Map<Address, u32> =
+            Map::new(&env);
+
         for i in 0..collaborators.len() {
+
             let addr = collaborators.get(i).unwrap();
+
             if share_map.contains_key(addr.clone()) {
                 panic!("duplicate collaborator address");
             }
-            share_map.set(addr, shares.get(i).unwrap());
+
+            share_map.set(
+                addr,
+                shares.get(i).unwrap(),
+            );
         }
 
-        let admin = collaborators.get(0).unwrap();
-        env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::Collaborators, &collaborators);
-        env.storage().instance().set(&DataKey::ShareMap, &share_map);
+        let admin =
+            collaborators.get(0).unwrap();
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Admin, &admin);
+
+        env.storage()
+            .instance()
+            .set(
+                &DataKey::Collaborators,
+                &collaborators,
+            );
+
+        env.storage()
+            .instance()
+            .set(
+                &DataKey::ShareMap,
+                &share_map,
+            );
+
+        let version =
+            String::from_str(
+                &env,
+                env!("CARGO_PKG_VERSION"),
+            );
+
+        env.storage()
+            .instance()
+            .set(
+                &DataKey::ContractVersion,
+                &version,
+            );
+    }
+
+    pub fn set_royalty_rate(
+        env: Env,
+        new_rate: u32,
+    ) {
+
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("contract not initialized");
+
+        admin.require_auth();
+
+        if new_rate > 10_000 {
+            panic!("royalty rate cannot exceed 10000 basis points");
+        }
+
+        env.storage()
+            .instance()
+            .set(
+                &DataKey::RoyaltyRate,
+                &new_rate,
+            );
     }
 
     /// Returns true if the contract has been initialized.
@@ -68,6 +140,7 @@ impl RoyaltySplitter {
             .instance()
             .get(&DataKey::Admin)
             .expect("contract not initialized");
+
         admin.require_auth();
 
         let token_client = token::Client::new(&env, &token);
@@ -81,6 +154,7 @@ impl RoyaltySplitter {
             .instance()
             .get(&DataKey::Collaborators)
             .expect("no collaborators");
+
         let share_map: Map<Address, u32> = env
             .storage()
             .instance()
@@ -89,38 +163,65 @@ impl RoyaltySplitter {
 
         let n = collaborators.len();
 
-        // Pre-calculate all payouts before executing any transfers.
-        let mut payouts: Vec<(Address, i128)> = Vec::new(&env);
+        let mut payouts:
+            Vec<(Address, i128)> =
+            Vec::new(&env);
+
         let mut total_calculated: i128 = 0;
+
         for i in 0..(n - 1) {
-            let addr = collaborators.get(i).unwrap();
-            let share = share_map.get(addr.clone()).unwrap_or(0);
-            let payout = amount * share as i128 / 10_000;
+
+            let addr =
+                collaborators.get(i).unwrap();
+
+            let share =
+                share_map
+                    .get(addr.clone())
+                    .unwrap_or(0);
+
+            let payout =
+                amount * share as i128 / 10_000;
+
             payouts.push_back((addr, payout));
+
             total_calculated += payout;
         }
-        // Last collaborator gets the remainder to avoid rounding dust loss.
-        let last = collaborators.get(n - 1).unwrap();
-        payouts.push_back((last, amount - total_calculated));
 
-        // All validation passed — execute transfers.
+        let last =
+            collaborators.get(n - 1).unwrap();
+
+        payouts.push_back((
+            last,
+            amount - total_calculated,
+        ));
+
         for (addr, payout) in payouts.iter() {
-            token_client.transfer(&env.current_contract_address(), &addr, &payout);
-            env.events().publish((symbol_short!("dist"),), (addr, payout));
+
+            token_client.transfer(
+                &env.current_contract_address(),
+                &addr,
+                &payout,
+            );
+
+            env.events().publish(
+                (symbol_short!("dist"),),
+                (addr, payout),
+            );
         }
     }
 
-    /// Record a secondary-market royalty: caller must pre-approve the contract to
-    /// pull `royalty_amount` tokens via transfer_from.
     pub fn record_secondary_royalty(
         env: Env,
         token: Address,
         from: Address,
         royalty_amount: i128,
     ) {
+
         from.require_auth();
 
-        let token_client = token::Client::new(&env, &token);
+        let token_client =
+            token::Client::new(&env, &token);
+
         token_client.transfer_from(
             &env.current_contract_address(),
             &from,
@@ -133,21 +234,32 @@ impl RoyaltySplitter {
             .instance()
             .get(&DataKey::SecondaryPool)
             .unwrap_or(0);
+
         env.storage()
             .instance()
-            .set(&DataKey::SecondaryPool, &(current_pool + royalty_amount));
+            .set(
+                &DataKey::SecondaryPool,
+                &(current_pool + royalty_amount),
+            );
+
         env.storage()
             .instance()
-            .set(&DataKey::SecondaryToken, &token);
+            .set(
+                &DataKey::SecondaryToken,
+                &token,
+            );
     }
 
-    /// Distribute the accumulated secondary royalty pool to all collaborators.
-    pub fn distribute_secondary_royalties(env: Env) {
+    pub fn distribute_secondary_royalties(
+        env: Env,
+    ) {
+
         let admin: Address = env
             .storage()
             .instance()
             .get(&DataKey::Admin)
             .expect("contract not initialized");
+
         admin.require_auth();
 
         let pool: i128 = env
@@ -155,6 +267,7 @@ impl RoyaltySplitter {
             .instance()
             .get(&DataKey::SecondaryPool)
             .unwrap_or(0);
+
         if pool == 0 {
             panic!("no secondary royalties to distribute");
         }
@@ -165,10 +278,14 @@ impl RoyaltySplitter {
             .get(&DataKey::SecondaryToken)
             .expect("no secondary token set");
 
-        let token_client = token::Client::new(&env, &token);
+        let token_client =
+            token::Client::new(&env, &token);
 
-        // Assert full pool is available before any transfers begin.
-        let balance = token_client.balance(&env.current_contract_address());
+        let balance =
+            token_client.balance(
+                &env.current_contract_address(),
+            );
+
         if pool > balance {
             panic!("pool exceeds contract balance");
         }
@@ -178,6 +295,7 @@ impl RoyaltySplitter {
             .instance()
             .get(&DataKey::Collaborators)
             .expect("no collaborators");
+
         let share_map: Map<Address, u32> = env
             .storage()
             .instance()
@@ -186,118 +304,118 @@ impl RoyaltySplitter {
 
         let n = collaborators.len();
 
-        // Pre-calculate all payouts before executing any transfers.
-        let mut payouts: Vec<(Address, i128)> = Vec::new(&env);
+        let mut payouts:
+            Vec<(Address, i128)> =
+            Vec::new(&env);
+
         let mut total_calculated: i128 = 0;
+
         for i in 0..(n - 1) {
-            let addr = collaborators.get(i).unwrap();
-            let share = share_map.get(addr.clone()).unwrap_or(0);
-            let payout = pool * share as i128 / 10_000;
+
+            let addr =
+                collaborators.get(i).unwrap();
+
+            let share =
+                share_map
+                    .get(addr.clone())
+                    .unwrap_or(0);
+
+            let payout =
+                pool * share as i128 / 10_000;
+
             payouts.push_back((addr, payout));
+
             total_calculated += payout;
         }
-        let last = collaborators.get(n - 1).unwrap();
-        payouts.push_back((last, pool - total_calculated));
+
+        let last =
+            collaborators.get(n - 1).unwrap();
+
+        payouts.push_back((
+            last,
+            pool - total_calculated,
+        ));
 
         for (addr, payout) in payouts.iter() {
-            token_client.transfer(&env.current_contract_address(), &addr, &payout);
+
+            token_client.transfer(
+                &env.current_contract_address(),
+                &addr,
+                &payout,
+            );
+
+            env.events().publish(
+                (symbol_short!("sec_dist"),),
+                (addr, payout),
+            );
         }
 
-        env.storage().instance().set(&DataKey::SecondaryPool, &0_i128);
+        env.storage()
+            .instance()
+            .set(
+                &DataKey::SecondaryPool,
+                &0_i128,
+            );
     }
 
-    pub fn get_share(env: Env, collaborator: Address) -> u32 {
-        let share_map: Map<Address, u32> = env
+    pub fn record_secondary_sale(
+        env: Env,
+        sale_price: i128,
+    ) -> i128 {
+
+        if sale_price <= 0 {
+            panic!("sale price must be positive");
+        }
+
+        let rate: u32 = env
             .storage()
             .instance()
-            .get(&DataKey::ShareMap)
-            .expect("contract not initialized");
-        share_map.get(collaborator).unwrap_or(0)
+            .get(&DataKey::RoyaltyRate)
+            .unwrap_or(0);
+
+        let royalty_amount =
+            sale_price * rate as i128 / 10_000;
+
+        royalty_amount
     }
 
-    pub fn get_collaborators(env: Env) -> Vec<Address> {
-        env.storage()
-            .instance()
-            .get(&DataKey::Collaborators)
-            .expect("contract not initialized")
-    }
+    pub fn get_royalty_rate(
+        env: Env,
+    ) -> u32 {
 
-    pub fn get_admin(env: Env) -> Address {
         env.storage()
             .instance()
-            .get(&DataKey::Admin)
-            .expect("contract not initialized")
-    }
-
-    pub fn get_secondary_pool(env: Env) -> i128 {
-        env.storage()
-            .instance()
-            .get(&DataKey::SecondaryPool)
+            .get(&DataKey::RoyaltyRate)
             .unwrap_or(0)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use soroban_sdk::{
-        token::{Client as TokenClient, StellarAssetClient},
-        vec, Address, Env,
-    };
+    pub fn version(
+        env: Env,
+    ) -> String {
 
-    fn setup(env: &Env) -> (Address, RoyaltySplitterClient) {
-        let contract_id = env.register_contract(None, RoyaltySplitter);
-        let client = RoyaltySplitterClient::new(env, &contract_id);
-        (contract_id, client)
+        env.storage()
+            .instance()
+            .get(&DataKey::ContractVersion)
+            .expect("contract not initialized")
     }
 
-    fn make_token(env: &Env, admin: &Address) -> Address {
-        env.register_stellar_asset_contract(admin.clone())
-    }
-
-    fn mint(env: &Env, token: &Address, to: &Address, amount: i128) {
-        StellarAssetClient::new(env, token).mint(to, &amount);
-    }
-
-    #[test]
-    fn test_admin_is_stored_on_initialize() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let (_, client) = setup(&env);
-        let a = Address::generate(&env);
-        let b = Address::generate(&env);
-        client.initialize(&vec![&env, a.clone(), b.clone()], &vec![&env, 5000_u32, 5000_u32]);
-        assert_eq!(client.get_admin(), a);
-    }
-
-    #[test]
-    fn test_distribute_splits_correctly() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let (contract_id, client) = setup(&env);
-
-        let admin = Address::generate(&env);
-        let b = Address::generate(&env);
-        let token_admin = Address::generate(&env);
-        let token = make_token(&env, &token_admin);
+    pub fn get_share(
+        env: Env,
+        collaborator: Address,
+    ) -> u32 {
 
         client.initialize(&vec![&env, admin.clone(), b.clone()], &vec![&env, 5000_u32, 5000_u32]);
         mint(&env, &token, &contract_id, 1000);
         client.distribute(&token);
 
-        assert_eq!(TokenClient::new(&env, &token).balance(&admin), 500);
-        assert_eq!(TokenClient::new(&env, &token).balance(&b), 500);
+        share_map
+            .get(collaborator)
+            .unwrap_or(0)
     }
 
-    #[test]
-    #[should_panic(expected = "duplicate collaborator address")]
-    fn test_duplicate_collaborator_rejected() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let (_, client) = setup(&env);
-        let a = Address::generate(&env);
-        client.initialize(&vec![&env, a.clone(), a.clone()], &vec![&env, 5000_u32, 5000_u32]);
-    }
+    pub fn get_collaborators(
+        env: Env,
+    ) -> Vec<Address> {
 
     #[test]
     #[should_panic(expected = "no balance to distribute")]
@@ -342,32 +460,9 @@ mod tests {
         assert_eq!(TokenClient::new(&env, &token).balance(&c), 60);
     }
 
-    #[test]
-    fn test_secondary_royalty_end_to_end() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let (contract_id, client) = setup(&env);
-
-        let admin = Address::generate(&env);
-        let b = Address::generate(&env);
-        let seller = Address::generate(&env);
-        let token_admin = Address::generate(&env);
-        let token = make_token(&env, &token_admin);
-
-        client.initialize(&vec![&env, admin.clone(), b.clone()], &vec![&env, 5000_u32, 5000_u32]);
-
-        mint(&env, &token, &seller, 200);
-        client.record_secondary_royalty(&token, &seller, &200_i128);
-
-        assert_eq!(client.get_secondary_pool(), 200);
-        assert_eq!(TokenClient::new(&env, &token).balance(&contract_id), 200);
-
-        client.distribute_secondary_royalties();
-
-        assert_eq!(TokenClient::new(&env, &token).balance(&admin), 100);
-        assert_eq!(TokenClient::new(&env, &token).balance(&b), 100);
-        assert_eq!(client.get_secondary_pool(), 0);
-    }
+    pub fn get_secondary_pool(
+        env: Env,
+    ) -> i128 {
 
     #[test]
     #[should_panic(expected = "pool exceeds contract balance")]

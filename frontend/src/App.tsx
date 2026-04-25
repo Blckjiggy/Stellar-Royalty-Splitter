@@ -22,6 +22,8 @@ import RecordSecondarySale from "./components/RecordSecondarySale";
 import DistributeSecondaryRoyalties from "./components/DistributeSecondaryRoyalties";
 import ResaleHistory from "./components/ResaleHistory";
 import { api } from "./api";
+
+
 import "./App.css";
 
 function isValidContractId(id: string): boolean {
@@ -36,7 +38,22 @@ export default function App() {
   const [contractIdError, setContractIdError] = useState<string | null>(null);
   const [contractInitialized, setContractInitialized] = useState<boolean | null>(null);
   const [royaltyRate, setRoyaltyRate] = useState(500); // Default 5%
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [currentPage, setCurrentPage] = useState(
+    () => localStorage.getItem("srs_currentPage") ?? "dashboard"
+  );
+    const contractIdValid = isValidContractId(contractId);
+
+  function handlePageChange(page: string) {
+    localStorage.setItem("srs_currentPage", page);
+    setCurrentPage(page);
+  }
+
+  function clearSavedContract() {
+    localStorage.removeItem("lastContractId");
+    localStorage.removeItem("srs_currentPage");
+    setContractId("");
+    setCurrentPage("dashboard");
+  }
 
   // Silently reconnect Freighter if it was previously authorized
   useEffect(() => {
@@ -97,7 +114,7 @@ export default function App() {
     }
   }
 
-  const contractIdValid = isValidContractId(contractId);
+
 
   const renderPage = () => {
     switch (currentPage) {
@@ -157,7 +174,7 @@ export default function App() {
           </div>
         );
       case "settings":
-        return <Settings contractId={contractId} />;
+        return <Settings contractId={contractId} onClearContract={clearSavedContract} />;
       case "secondary":
         return walletAddress && contractId ? (
           <div className="page-section">
@@ -204,7 +221,7 @@ export default function App() {
     <div className="app-wrapper">
       <Navigation
         currentPage={currentPage}
-        onPageChange={setCurrentPage}
+        onPageChange={handlePageChange}
         walletAddress={walletAddress}
       />
 
@@ -244,7 +261,7 @@ export default function App() {
                   className={`quick-action-btn ${
                     currentPage === "dashboard" ? "active" : ""
                   }`}
-                  onClick={() => setCurrentPage("dashboard")}
+                  onClick={() => handlePageChange("dashboard")}
                 >
                   Dashboard
                 </button>
@@ -252,7 +269,7 @@ export default function App() {
                   className={`quick-action-btn ${
                     currentPage === "transactions" ? "active" : ""
                   }`}
-                  onClick={() => setCurrentPage("transactions")}
+                  onClick={() => handlePageChange("transactions")}
                 >
                   History
                 </button>
@@ -262,7 +279,7 @@ export default function App() {
                       className={`quick-action-btn ${
                         currentPage === "initialize" ? "active" : ""
                       }`}
-                      onClick={() => setCurrentPage("initialize")}
+                      onClick={() => handlePageChange("initialize")}
                     >
                       Initialize
                     </button>
@@ -270,7 +287,7 @@ export default function App() {
                       className={`quick-action-btn ${
                         currentPage === "distribute" ? "active" : ""
                       }`}
-                      onClick={() => setCurrentPage("distribute")}
+                      onClick={() => handlePageChange("distribute")}
                     >
                       Distribute
                     </button>
@@ -278,7 +295,7 @@ export default function App() {
                       className={`quick-action-btn ${
                         currentPage === "secondary" ? "active" : ""
                       }`}
-                      onClick={() => setCurrentPage("secondary")}
+                      onClick={() => handlePageChange("secondary")}
                     >
                       Secondary Royalties
                     </button>
