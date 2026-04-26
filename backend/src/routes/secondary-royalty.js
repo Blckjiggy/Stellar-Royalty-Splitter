@@ -251,14 +251,9 @@ secondaryRoyaltyRouter.post("/distribute", async (req, res, next) => {
  */
 const statsCache = new Map(); // key: contractId, value: { data, expiresAt }
 
-secondaryRoyaltyRouter.get("/stats/:contractId", (req, res, next) => {
+secondaryRoyaltyRouter.get("/stats/:contractId", validateContractIdMiddleware, (req, res, next) => {
   try {
     const { contractId } = req.params;
-
-    if (!contractId) {
-      return res.status(400).json({ error: "Contract ID is required." });
-    }
-
     const cached = statsCache.get(contractId);
     if (cached && cached.expiresAt > Date.now()) {
       return res.json(cached.data);
@@ -302,14 +297,10 @@ secondaryRoyaltyRouter.get("/sales/:contractId", (req, res, next) => {
  * Query params: limit, offset
  * Returns paginated list of secondary royalty distributions
  */
-secondaryRoyaltyRouter.get("/distributions/:contractId", (req, res, next) => {
+secondaryRoyaltyRouter.get("/distributions/:contractId", validateContractIdMiddleware, (req, res, next) => {
   try {
     const { contractId } = req.params;
     const { limit = 50, offset = 0 } = req.query;
-
-    if (!contractId) {
-      return res.status(400).json({ error: "Contract ID is required." });
-    }
 
     const distributions = getSecondaryRoyaltyDistributions(
       contractId,
