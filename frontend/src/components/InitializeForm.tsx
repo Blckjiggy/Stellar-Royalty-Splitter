@@ -15,6 +15,7 @@ interface Props {
 }
 
 const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
+const MAX_COLLABORATORS = 50;
 
 export default function InitializeForm({
   contractId,
@@ -187,8 +188,19 @@ export default function InitializeForm({
         Total: {total} / 10,000 bp ({(total / 100).toFixed(2)}%)
       </div>
 
+      {collaborators.length >= MAX_COLLABORATORS - 5 && collaborators.length < MAX_COLLABORATORS && (
+        <div className="status info">
+          Approaching the limit — max {MAX_COLLABORATORS} collaborators allowed ({MAX_COLLABORATORS - collaborators.length} remaining).
+        </div>
+      )}
+      {collaborators.length >= MAX_COLLABORATORS && (
+        <div className="status error">
+          Maximum of {MAX_COLLABORATORS} collaborators reached. Remove one to add another.
+        </div>
+      )}
+
       <div className="row">
-        <button className="btn-add" onClick={addRow}>
+        <button className="btn-add" onClick={addRow} disabled={collaborators.length >= MAX_COLLABORATORS}>
           + Add collaborator
         </button>
         <button
