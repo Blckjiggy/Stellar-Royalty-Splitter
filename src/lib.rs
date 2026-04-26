@@ -438,6 +438,15 @@ impl RoyaltySplitter {
         share_map.contains_key(addr)
     }
 
+    pub fn collaborator_count(env: Env) -> u32 {
+        let collaborators: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Collaborators)
+            .unwrap_or(Vec::new(&env));
+        collaborators.len()
+    }
+
     pub fn get_collaborators(
         env: Env,
     ) -> Vec<Address> {
