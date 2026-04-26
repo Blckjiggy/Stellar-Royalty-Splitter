@@ -206,3 +206,14 @@ fn test_collaborator_count() {
     );
     assert_eq!(client.collaborator_count(), 3);
 }
+
+#[test]
+#[should_panic]
+fn test_unauthorized_init_rejected() {
+    let env = Env::default();
+    // No mock_all_auths — require_auth() on the admin must reject the call.
+    let (_, client) = setup(&env);
+    let admin = Address::generate(&env);
+    let b = Address::generate(&env);
+    client.initialize(&vec![&env, admin, b], &vec![&env, 5000_u32, 5000_u32]);
+}

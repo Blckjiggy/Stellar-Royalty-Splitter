@@ -36,6 +36,10 @@ impl RoyaltySplitter {
             panic!("need at least one collaborator");
         }
 
+        // The first collaborator is the admin and must sign the init tx,
+        // preventing any third party from front-running initialization.
+        collaborators.get(0).unwrap().require_auth();
+
         if collaborators.len() != shares.len() {
             panic!("collaborators and shares length mismatch");
         }
