@@ -172,6 +172,13 @@ impl RoyaltySplitter {
         env.storage().instance().extend_ttl(MIN_TTL, MAX_TTL);
         token::Client::new(&env, &token).balance(&env.current_contract_address())
     }
+    /// Returns the contract's balance of a specific token.
+    /// This is a view function that can be called without auth.
+    pub fn get_token_balance(env: Env, token: Address) -> i128 {
+        env.storage().instance().extend_ttl(MIN_TTL, MAX_TTL);
+        token::Client::new(&env, &token).balance(&env.current_contract_address())
+    }
+
 
     /// Distribute the full contract balance of `token` to all collaborators.
     /// 
