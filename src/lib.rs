@@ -15,6 +15,8 @@ pub enum DataKey {
     SecondaryToken,
     ContractVersion,
     RoyaltyRate,
+    LastDistribution,
+    LastSecondaryDistribution,
 }
 
 const MIN_TTL: u32 = 17_280;
@@ -194,6 +196,18 @@ impl RoyaltySplitter {
         admin.require_auth();
         
         if Self::get_total_shares(env.clone()) != 10_000 {
+        /// Returns the timestamp of the last primary distribution, or None if never distributed.
+        pub fn get_last_distribution(env: Env) -> Option<u64> {
+            env.storage().instance().extend_ttl(MIN_TTL, MAX_TTL);
+            env.storage().instance().get(&DataKey::LastDistribution)
+        }
+
+        /// Returns the timestamp of the last secondary distribution, or None if never distributed.
+        pub fn get_last_secondary_distribution(env: Env) -> Option<u64> {
+            env.storage().instance().extend_ttl(MIN_TTL, MAX_TTL);
+            env.storage().instance().get(&DataKey::LastSecondaryDistribution)
+        }
+
             panic!("total shares must sum to 10000");
         }
 
@@ -273,6 +287,11 @@ impl RoyaltySplitter {
             (symbol_short!("royalty"), symbol_short!("dist_all")),
             (token, amount),
         );
+
+        // Record the timestamp of this distribution
+        env.storage()
+            .instance()
+            .set(&DataKey::LastDistribution, &env.ledger().timestamp());
     }
 
     /// Record a secondary royalty payment from a resale.
@@ -447,6 +466,11 @@ impl RoyaltySplitter {
             (symbol_short!("royalty"), symbol_short!("sec_dist")),
             (token, pool),
         );
+
+        // Record the timestamp of this secondary distribution
+        env.storage()
+            .instance()
+            .set(&DataKey::LastSecondaryDistribution, &env.ledger().timestamp());
     }
 
     /// Calculate the royalty amount for a secondary sale.

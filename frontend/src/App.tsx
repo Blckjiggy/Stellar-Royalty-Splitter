@@ -23,6 +23,7 @@ import SecondaryRoyaltyConfig from "./components/SecondaryRoyaltyConfig";
 import RecordSecondarySale from "./components/RecordSecondarySale";
 import DistributeSecondaryRoyalties from "./components/DistributeSecondaryRoyalties";
 import ResaleHistory from "./components/ResaleHistory";
+import { Skeleton } from "./components/Skeleton";
 import { api } from "./api";
 
 
@@ -48,6 +49,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(
     () => localStorage.getItem("srs_currentPage") ?? "dashboard"
   );
+  const [initialLoading, setInitialLoading] = useState(true);
 
   function handlePageChange(page: string) {
     localStorage.setItem("srs_currentPage", page);
@@ -65,12 +67,17 @@ export default function App() {
   useEffect(() => {
     async function tryReconnect() {
       // window.freighter is injected at runtime by the browser extension
-      if (!window.freighter) return;
+      if (!window.freighter) {
+        setInitialLoading(false);
+        return;
+      }
       try {
         const { address } = await window.freighter.getAddress();
         if (address) setWalletAddress(address);
       } catch {
         // Not yet authorized — user must connect manually
+      } finally {
+        setInitialLoading(false);
       }
     }
     tryReconnect();
@@ -242,6 +249,17 @@ export default function App() {
         return null;
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="app-wrapper">
+        <div className="app-loading">
+          <Skeleton width="200px" height="40px" className="mb-4" />
+          <Skeleton width="100%" height="60vh" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-wrapper">
